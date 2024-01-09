@@ -1,0 +1,74 @@
+name: Update
+
+on:
+  repository_dispatch:
+  workflow_dispatch:
+  schedule:
+    - cron: 0 */3 * * *
+
+env:
+  TZ: Asia/Shanghai
+
+jobs:
+  Update:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v3
+
+    - name: GetTime
+      id: date
+      run: echo "date=$(date +'%Y-%m-%d %H:%M:%S CST')" >> $GITHUB_OUTPUT
+
+    - name: Update
+      run: |
+        # APTV
+        rm -f ./m3u/aptv.m3u && wget https://raw.githubusercontent.com/Kimentanm/aptv/master/m3u/iptv.m3u -O ./m3u/aptv.m3u
+        
+        # 央视源
+        rm -f ./m3u/CCTV.m3u && wget https://raw.githubusercontent.com/fanmingming/live/main/tv/m3u/ipv6.m3u -O ./m3u/CCTV.m3u
+        sed -i -n '/央视/,+1p' ./m3u/CCTV.m3u
+        sed -i '1i #EXTM3U' ./m3u/CCTV.m3u
+        sed -i '/^\s*$/d' ./m3u/CCTV.m3u
+
+        # 卫视源
+        rm -f ./m3u/CNTV.m3u && wget https://raw.githubusercontent.com/fanmingming/live/main/tv/m3u/ipv6.m3u -O ./m3u/CNTV.m3u
+        sed -i '/央视/,+1d' ./m3u/CNTV.m3u
+        sed -i '/^\s*$/d' ./m3u/CNTV.m3u
+
+        # 成人源
+        rm -f ./m3u/Adult.m3u && wget http://adultiptv.net/chs.m3u -O ./m3u/Adult.m3u
+        sed -i 's/XXX/成人/' ./m3u/Adult.m3u
+        sed -i 's/AdultIPTV.net //g' ./m3u/Adult.m3u
+        wget https://raw.githubusercontent.com/YanG-1989/m3u/main/Adult.m3u -O ./m3u/AdultVideo.txt
+        sed -i -n '/日本/,+1p' ./m3u/AdultVideo.txt
+        sed -i 's/日本/成人/' ./m3u/AdultVideo.txt
+        echo'' >> ./m3u/Adult.m3u && cat ./m3u/AdultVideo.txt >> ./m3u/Adult.m3u
+        rm -f ./m3u/AdultVideo.txt
+        sed -i '/^\s*$/d' ./m3u/Adult.m3u
+
+        # 整合源
+        rm -f ./m3u/IPTV.m3u && touch ./m3u/IPTV.m3u
+        cat ./m3u/CCTV.m3u >> ./m3u/IPTV.m3u
+        cat ./m3u/CNTV.m3u >> ./m3u/IPTV.m3u
+        cat ./m3u/Adult.m3u >> ./m3u/IPTV.m3u
+        sed -i '/#EXTM3U/d' ./m3u/IPTV.m3u
+        sed -i '1i #EXTM3U' ./m3u/IPTV.m3u
+        sed -i '/^\s*$/d' ./m3u/IPTV.m3u
+
+        # 节目源
+        rm -f ./m3u/EPG.xml && wget https://epg.112114.xyz/pp.xml -O ./m3u/EPG.xml
+        echo "Auto Update IPTV in ${{ steps.date.outputs.date }}" > ./m3u/update.md
+
+    - name: Clean
+      run: |
+        git config --local user.email "github-actions[bot]@users.noreply.github.com"
+        git config --local user.name "github-actions[bot]"
+        git checkout --orphan latest_branch
+        git add -A
+        git commit -am "${{ steps.date.outputs.date }}"
+        git branch -D main
+        git branch -m main
+
+    - name: Push
+      run: git push -f origin main

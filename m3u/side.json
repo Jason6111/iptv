@@ -1,0 +1,8 @@
+{
+    "servers": [
+        {
+            "name": "jason",
+            "address": "http://192.168.31.66:6969"
+        }
+    ]
+}        
